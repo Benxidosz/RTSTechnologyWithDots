@@ -488,7 +488,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 5276542875285722650, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: rStep
-      value: 15
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 5276542875285722650, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: mapSize
@@ -496,7 +496,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5276542875285722650, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: angleStepInDegree
-      value: 10
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224529, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: m_RootOrder

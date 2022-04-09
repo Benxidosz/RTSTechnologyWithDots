@@ -8,6 +8,7 @@ using Random = UnityEngine.Random;
 
 namespace Systems {
     [UpdateAfter(typeof(CoreTriggerEventSystem))]
+    [UpdateAfter(typeof(BulletSystem))]
     public partial class ZombieSpawnerSystem : SystemBase {
         private Translation _zombieSpawnerTranslation;
         private ZombieSpawnerComponent _zombieSpawnerComponent;

@@ -35,14 +35,60 @@ namespace Systems {
 
             _gridSlice = GetSingleton<GridSliceComponent>();
         }
+        
+        [BurstCompile]
+        private struct IndexCalculateJob : IJobParallelFor {
+            public NativeArray<int> CountIndexArray;
 
-        private struct GridBuilderJob : IJobFor {
-            public NativeArray<EntityWithPositionOrCount> Grid;
             [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<Translation> TargetTranslationArray;
+
+            public float RStep;
+            public float AngleStep;
+            public int RCount;
+            public int AngleCount;
+            public int TargetCount;
+            public void Execute(int i) {
+                var tmpPosition = TargetTranslationArray[i].Value;
+
+                int r = (int) math.floor(math.length(tmpPosition) / RStep);
+                float tmpAlfa = math.acos(math.dot(new float3(0.0f, 0.0f, 1.0f),
+                    math.normalize(tmpPosition)));
+                int angle = (int) math.floor(tmpAlfa / AngleStep);
+
+                var countIndex = (r * AngleCount + angle) * TargetCount;
+
+                if (r >= RCount) {
+                    countIndex = ((RCount - 1) * AngleCount + angle) * TargetCount;
+                }
+
+                CountIndexArray[i] = countIndex;
+            }
+        }
+
+        [BurstCompile]
+        private struct GridBuilderJob : IJob {
+            public NativeArray<EntityWithPositionOrCount> Grid;
+            
+            [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<int> CountIndexArray;
+            [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<TravelToCore> TargetTravelArray;
             [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<Entity> TargetArray;
 
-            public void Execute(int index) {
-                throw new NotImplementedException();
+            public void Execute() {
+                for (int i = 0; i < CountIndexArray.Length; ++i) {
+                    int countIndex = CountIndexArray[i];
+                    var entity = TargetArray[i];
+                    var travel = TargetTravelArray[i];
+                    int count = Grid[countIndex].Count;
+                    int index = count + countIndex + 1;
+                    
+                    Grid[index] = new EntityWithPositionOrCount {
+                        Entity = entity,
+                        TravelComponent = travel
+                    };
+                    Grid[countIndex] = new EntityWithPositionOrCount {
+                        Count = count + 1
+                    };
+                }
             }
         } 
 
@@ -77,6 +123,7 @@ namespace Systems {
                     int angle = (int) math.floor(tmpAlfa / AngleStep);
 
                     var countIndex = (r * AngleCount + angle) * TargetCount;
+                    
                     if (Grid[countIndex].Count == 0) {
                         bool found = false;
                         bool has = true;
@@ -141,6 +188,10 @@ namespace Systems {
                 (rCount + 1) * angleCount * (targetEntityArray.Length + 1), Allocator.TempJob
             );
 
+            var indexArray = new NativeArray<int>(
+                targetCount, Allocator.TempJob
+            );
+
 
             for (int r = 0; r < rCount; r++) {
                 for (int angle = 0; angle < angleCount; angle++) {
@@ -151,35 +202,24 @@ namespace Systems {
                 }
             }
 
-            for (int i = 0; i < targetEntityArray.Length; ++i) {
-                var tmpEntity = targetEntityArray[i];
-                var tmpPosition = targetTranslationArray[i].Value;
-                var tmpTravel = targetTravelArray[i];
+            var indexBuilderJob = new IndexCalculateJob {
+                TargetTranslationArray = targetTranslationArray,
+                RCount = rCount,
+                RStep = rStep,
+                AngleCount = angleCount,
+                AngleStep = angleStep,
+                TargetCount = targetCount,
+                CountIndexArray = indexArray
+            };
 
-                int r = (int) math.floor(math.length(tmpPosition) / rStep);
-                float tmpAlfa = math.acos(math.dot(new float3(0.0f, 0.0f, 1.0f),
-                    math.normalize(tmpPosition)));
-                int angle = (int) math.floor(tmpAlfa / angleStep);
+            var gridBuilderJob = new GridBuilderJob {
+                Grid = grid,
+                CountIndexArray = indexArray,
+                TargetTravelArray = targetTravelArray,
+                TargetArray = targetEntityArray
+            };
 
-                var countIndex = (r * angleCount + angle) * targetEntityArray.Length;
-
-                if (r >= rCount) {
-                    countIndex = (rCount * angleCount + angle) * targetEntityArray.Length;
-                }
-
-                var count = grid[countIndex].Count;
-                var index = countIndex + 1 + count;
-                grid[index] = new EntityWithPositionOrCount {
-                    Entity = tmpEntity,
-                    TravelComponent = tmpTravel
-                };
-                grid[countIndex] = new EntityWithPositionOrCount {
-                    Count = count + 1
-                };
-            }
-
-
-            var job = new FindTargetJob {
+            var findTargetJob = new FindTargetJob {
                 TranslationHandle = translationType,
                 TargetCompHandle = soldierShootingType,
                 Grid = grid,
@@ -191,13 +231,14 @@ namespace Systems {
                 Random = rand,
                 Soldiers = soldierArray
             };
-            Dependency = job.ScheduleParallel(_soldierQuery, Dependency);
+            Dependency = indexBuilderJob.Schedule(targetCount, 64, Dependency);
+            Dependency = gridBuilderJob.Schedule(Dependency);
+            Dependency.Complete();
+            
+            Dependency = findTargetJob.ScheduleParallel(_soldierQuery, Dependency);
 
             Dependency.Complete();
             
-            targetEntityArray.Dispose();
-            targetTranslationArray.Dispose();
-            targetTravelArray.Dispose();
             grid.Dispose();
         }
     }

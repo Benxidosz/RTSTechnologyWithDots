@@ -52,7 +52,7 @@ namespace Systems {
                 CommandBuffer.SetComponent(coreEntity, new CoreHealthComponent {
                     CoreHealth = health 
                 });
-                CommandBuffer.AddComponent(zombieEntity, new DeadTag());
+                CommandBuffer.DestroyEntity(zombieEntity);
             }
         }
 
