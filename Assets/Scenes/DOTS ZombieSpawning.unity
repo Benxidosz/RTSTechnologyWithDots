@@ -495,11 +495,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 5276542875285722650, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: rStep
-      value: 10
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5276542875285722650, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
+      propertyPath: mapSize
+      value: 500
       objectReference: {fileID: 0}
     - target: {fileID: 5276542875285722650, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: angleStepInDegree
-      value: 10
+      value: 60
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224529, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: m_RootOrder
@@ -551,7 +555,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224534, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: SoldierCount
-      value: 0
+      value: 3000
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224537, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: m_Name
