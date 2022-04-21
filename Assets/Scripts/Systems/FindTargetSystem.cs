@@ -9,8 +9,6 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Physics.Systems;
 using Unity.Transforms;
-using UnityEditor;
-using Debug = UnityEngine.Debug;
 using Random = Unity.Mathematics.Random;
 
 namespace Systems {
@@ -21,12 +19,16 @@ namespace Systems {
         private EntityQuery _targetQuery;
         private GridSliceComponent _gridSlice;
 
+        private NativeArray<Entity> _targetGrid;
+
+
         protected override void OnStartRunning() {
             base.OnStartRunning();
             var queryDesc = new EntityQueryDesc {
                 All = new ComponentType[] {
                     typeof(SoldierShooting),
-                    typeof(SoldierMovement)
+                    typeof(SoldierMovement),
+                    typeof(Translation)
                 }
             };
             var targetDesc = new EntityQueryDesc {
@@ -39,6 +41,15 @@ namespace Systems {
             _targetQuery = GetEntityQuery(targetDesc);
 
             _gridSlice = GetSingleton<GridSliceComponent>();
+
+            float rStep = _gridSlice.rStep;
+            float angleStep = _gridSlice.angleStep;
+            int rCount = (int) math.ceil(_gridSlice.mapSize / rStep) + 1;
+            int angleCount = (int) math.ceil(2 * math.PI / angleStep);
+
+            _targetGrid = new NativeArray<Entity>(
+                0, Allocator.Persistent
+            );
         }
 
         [BurstCompile]
@@ -93,8 +104,9 @@ namespace Systems {
 
         [BurstCompile]
         private struct FindTargetJob : IJobEntityBatch {
-            [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<Entity> Grid;
-            [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<int> CellCounts;
+            [ReadOnly] public NativeArray<Entity> Grid;
+            [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<int> TargetCellCounts;
+            [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<int> SoldierCellCounts;
             public ComponentTypeHandle<TargetComp> TargetCompHandle;
             [ReadOnly] public ComponentTypeHandle<Translation> TranslationHandle;
             public float RStep;
@@ -122,8 +134,8 @@ namespace Systems {
                     int angle = (int) math.floor(tmpAlfa / AngleStep);
 
                     var countIndex = r * AngleCount + angle;
-                    
-                    if (CellCounts[countIndex] == 0) {
+
+                    if (TargetCellCounts[countIndex] == 0) {
                         bool found = false;
                         bool has = true;
                         int dist = 1;
@@ -134,22 +146,43 @@ namespace Systems {
                                 int alfaDiffPositive = i;
                                 int alfaDiffNegative = -i;
                                 int rDiff = dist - diff;
-                                int tmpR = r + rDiff;
+                                int tmpRPos = r + rDiff;
+                                int tmpRNeg = r - rDiff;
                                 int tmpAnglePos = angle + alfaDiffPositive;
                                 int tmpAngleNeg = angle + alfaDiffNegative;
-                                if (tmpR < RCount && tmpAnglePos >= 0 && tmpAnglePos < AngleCount) {
+                                if (tmpRPos < RCount && tmpRPos >= 0 && tmpAnglePos >= 0 && tmpAnglePos < AngleCount) {
                                     has = true;
-                                    var tmpCountIndex = tmpR * AngleCount + tmpAnglePos;
-                                    if (CellCounts[tmpCountIndex] > 0) {
+                                    var tmpCountIndex = tmpRPos * AngleCount + tmpAnglePos;
+                                    if (TargetCellCounts[tmpCountIndex] > 0) {
                                         found = true;
                                         countIndex = tmpCountIndex;
                                         break;
                                     }
                                 }
-                                if (tmpR < RCount && tmpAngleNeg >= 0 && tmpAngleNeg < AngleCount) {
+
+                                if (tmpRPos < RCount && tmpRPos >= 0 && tmpAngleNeg >= 0 && tmpAngleNeg < AngleCount) {
                                     has = true;
-                                    var tmpCountIndex = tmpR * AngleCount + tmpAngleNeg;
-                                    if (CellCounts[tmpCountIndex] > 0) {
+                                    var tmpCountIndex = tmpRPos * AngleCount + tmpAngleNeg;
+                                    if (TargetCellCounts[tmpCountIndex] > 0) {
+                                        found = true;
+                                        countIndex = tmpCountIndex;
+                                        break;
+                                    }
+                                }
+                                if (tmpRNeg < RCount && tmpRNeg >= 0 && tmpAnglePos >= 0 && tmpAnglePos < AngleCount) {
+                                    has = true;
+                                    var tmpCountIndex = tmpRNeg * AngleCount + tmpAnglePos;
+                                    if (TargetCellCounts[tmpCountIndex] > 0) {
+                                        found = true;
+                                        countIndex = tmpCountIndex;
+                                        break;
+                                    }
+                                }
+
+                                if (tmpRNeg < RCount && tmpRNeg >= 0 && tmpAngleNeg >= 0 && tmpAngleNeg < AngleCount) {
+                                    has = true;
+                                    var tmpCountIndex = tmpRNeg * AngleCount + tmpAngleNeg;
+                                    if (TargetCellCounts[tmpCountIndex] > 0) {
                                         found = true;
                                         countIndex = tmpCountIndex;
                                         break;
@@ -161,7 +194,7 @@ namespace Systems {
                         }
                     }
 
-                    var count = CellCounts[countIndex];
+                    var count = TargetCellCounts[countIndex];
                     if (count > 0) {
                         var firstIndex = countIndex * TargetCount;
                         closestTarget = Grid[firstIndex + Random.NextInt(1, count)];
@@ -173,6 +206,13 @@ namespace Systems {
                     }
                 }
             }
+        }
+
+        private void ReallocateGrid(int length, ref NativeArray<Entity> grid) {
+            grid.Dispose();
+            grid = new NativeArray<Entity>(
+                length * 2, Allocator.Persistent
+            );
         }
 
         protected override void OnUpdate() {
@@ -192,56 +232,65 @@ namespace Systems {
             int targetCount = targetEntityArray.Length;
             var rand = new Random((uint) Stopwatch.GetTimestamp());
 
-            var grid = new NativeArray<Entity>(
-                (rCount + 1) * angleCount * (targetEntityArray.Length), Allocator.TempJob
+            if (_targetGrid.Length < (rCount + 1) * angleCount * targetEntityArray.Length) 
+                ReallocateGrid((rCount + 1) * angleCount * targetEntityArray.Length, ref _targetGrid);
+
+            var targetCellCounts = new NativeArray<int>(
+                (rCount + 1) * angleCount, Allocator.TempJob
             );
-            
-            var cellCounts = new NativeArray<int>(
+            var soldierCellCounts = new NativeArray<int>(
                 (rCount + 1) * angleCount, Allocator.TempJob
             );
 
-            for (int i = 0; i < cellCounts.Length; ++i) {
-                cellCounts[i] = 0;
+            for (int i = 0; i < targetCellCounts.Length; ++i) {
+                targetCellCounts[i] = 0;
+                soldierCellCounts[i] = 0;
             }
 
-            var indexArray = new NativeArray<int>(
+            var targetIndexArray = new NativeArray<int>(
                 targetCount, Allocator.TempJob
             );
 
-            var indexBuilderJob = new IndexCalculateJob {
+            var targetIndexBuilderJob = new IndexCalculateJob {
                 TargetTranslationArray = targetTranslationArray,
                 RCount = rCount,
                 RStep = rStep,
                 AngleCount = angleCount,
                 AngleStep = angleStep,
-                CountIndexArray = indexArray
+                CountIndexArray = targetIndexArray
             };
 
-            var gridBuilderJob = new GridBuilderJob {
-                Grid = grid,
-                CellCounts = cellCounts,
-                CountIndexArray = indexArray,
+            var targetGridBuilderJob = new GridBuilderJob {
+                Grid = _targetGrid,
+                CellCounts = targetCellCounts,
+                CountIndexArray = targetIndexArray,
                 TargetArray = targetEntityArray
             };
 
             var findTargetJob = new FindTargetJob {
                 TranslationHandle = translationType,
                 TargetCompHandle = soldierShootingType,
-                CellCounts = cellCounts,
-                Grid = grid,
+                TargetCellCounts = targetCellCounts,
+                Grid = _targetGrid,
                 RStep = rStep,
                 AngleStep = angleStep,
                 AngleCount = angleCount,
                 RCount = rCount,
                 TargetCount = targetCount,
                 Random = rand,
-                MaxDist = maxDist
+                MaxDist = maxDist,
+                SoldierCellCounts = soldierCellCounts
             };
-            Dependency = indexBuilderJob.Schedule(targetCount, 64, Dependency);
-            Dependency = gridBuilderJob.Schedule(Dependency);
+            Dependency = targetIndexBuilderJob.Schedule(targetCount, 64, Dependency);
+            Dependency = targetGridBuilderJob.Schedule(Dependency);
             Dependency = findTargetJob.ScheduleParallel(_soldierQuery, Dependency);
 
             Dependency.Complete();
+        }
+
+        protected override void OnStopRunning() {
+            base.OnStopRunning();
+            _targetGrid.Dispose();
         }
     }
 }

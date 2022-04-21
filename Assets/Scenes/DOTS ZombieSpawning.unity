@@ -499,7 +499,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5276542875285722650, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: mapSize
-      value: 500
+      value: 250
       objectReference: {fileID: 0}
     - target: {fileID: 5276542875285722650, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: angleStepInDegree
@@ -551,11 +551,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224534, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: Count
-      value: 15000
+      value: 10000
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224534, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: SoldierCount
-      value: 3000
+      value: 1000
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224537, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: m_Name
