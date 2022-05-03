@@ -9,17 +9,19 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Physics.Systems;
 using Unity.Transforms;
+using Debug = UnityEngine.Debug;
 using Random = Unity.Mathematics.Random;
 
 namespace Systems {
     [UpdateAfter(typeof(StepPhysicsWorld))]
     [UpdateAfter(typeof(BeginSimulationEntityCommandBufferSystem))]
-    public partial class FindTargetSystem : SystemBase {
+    public partial class SoldierFindTargetSystem : SystemBase {
         private EntityQuery _soldierQuery;
         private EntityQuery _targetQuery;
         private GridSliceComponent _gridSlice;
 
-        private NativeArray<Entity> _targetGrid;
+        private NativeArray<Entity> _targetPolarGrid;
+        private NativeArray<Entity> _soldierPolarGrid;
 
 
         protected override void OnStartRunning() {
@@ -42,18 +44,16 @@ namespace Systems {
 
             _gridSlice = GetSingleton<GridSliceComponent>();
 
-            float rStep = _gridSlice.rStep;
-            float angleStep = _gridSlice.angleStep;
-            int rCount = (int) math.ceil(_gridSlice.mapSize / rStep) + 1;
-            int angleCount = (int) math.ceil(2 * math.PI / angleStep);
-
-            _targetGrid = new NativeArray<Entity>(
+            _targetPolarGrid = new NativeArray<Entity>(
+                0, Allocator.Persistent
+            );
+            _soldierPolarGrid = new NativeArray<Entity>(
                 0, Allocator.Persistent
             );
         }
 
         [BurstCompile]
-        private struct IndexCalculateJob : IJobParallelFor {
+        private struct PolarIndexCalculateJob : IJobParallelFor {
             public NativeArray<int> CountIndexArray;
 
             [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<Translation> TargetTranslationArray;
@@ -67,8 +67,13 @@ namespace Systems {
                 var tmpPosition = TargetTranslationArray[i].Value;
 
                 int r = (int) math.floor(math.length(tmpPosition) / RStep);
-                float tmpAlfa = math.acos(math.dot(new float3(0.0f, 0.0f, 1.0f),
+
+                float3 baseVec = new float3(0.0f, 0.0f, 1.0f);
+                float tmpAlfa = math.acos(math.dot(baseVec,
                     math.normalize(tmpPosition)));
+                float3 dir = math.cross(baseVec, math.normalize(tmpPosition));
+                if (dir.y < 0)
+                    tmpAlfa = 2 * math.PI - tmpAlfa;
                 int angle = (int) math.floor(tmpAlfa / AngleStep);
 
                 var countIndex = r * AngleCount + angle;
@@ -82,7 +87,7 @@ namespace Systems {
         }
 
         [BurstCompile]
-        private struct GridBuilderJob : IJob {
+        private struct PolarGridBuilderJob : IJob {
             public NativeArray<Entity> Grid;
             public NativeArray<int> CellCounts;
 
@@ -94,7 +99,7 @@ namespace Systems {
                     int countIndex = CountIndexArray[i];
                     var entity = TargetArray[i];
                     int count = CellCounts[countIndex];
-                    int index = count + countIndex * TargetArray.Length + 1;
+                    int index = count + countIndex * TargetArray.Length;
 
                     Grid[index] = entity;
                     CellCounts[countIndex]++;
@@ -102,8 +107,8 @@ namespace Systems {
             }
         }
 
-        [BurstCompile]
-        private struct FindTargetJob : IJobEntityBatch {
+        //[BurstCompile]
+        private struct SoldierFindTargetJob : IJobEntityBatch {
             [ReadOnly] public NativeArray<Entity> Grid;
             [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<int> TargetCellCounts;
             [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<int> SoldierCellCounts;
@@ -129,30 +134,38 @@ namespace Systems {
                     Entity closestTarget = Entity.Null;
 
                     int r = (int) math.floor(math.length(soldierPosition) / RStep);
-                    float tmpAlfa = math.acos(math.dot(new float3(0.0f, 0.0f, 1.0f),
+
+                    float3 baseVec = new float3(0.0f, 0.0f, 1.0f);
+                    float tmpAlfa = math.acos(math.dot(baseVec,
                         math.normalize(soldierPosition)));
+                    float3 dir = math.cross(baseVec, math.normalize(soldierPosition));
+                    if (dir.y < 0)
+                        tmpAlfa = 2 * math.PI - tmpAlfa;
                     int angle = (int) math.floor(tmpAlfa / AngleStep);
 
                     var countIndex = r * AngleCount + angle;
 
                     if (TargetCellCounts[countIndex] == 0) {
                         bool found = false;
-                        bool has = true;
                         int dist = 1;
 
-                        while (!found && has && dist < MaxDist) {
-                            has = false;
+                        while (!found && dist < MaxDist) {
                             for (int diff = 0; diff <= dist; ++diff) {
-                                int alfaDiffPositive = i;
-                                int alfaDiffNegative = -i;
                                 int rDiff = dist - diff;
-                                int tmpRPos = r + rDiff;
-                                int tmpRNeg = r - rDiff;
-                                int tmpAnglePos = angle + alfaDiffPositive;
-                                int tmpAngleNeg = angle + alfaDiffNegative;
-                                if (tmpRPos < RCount && tmpRPos >= 0 && tmpAnglePos >= 0 && tmpAnglePos < AngleCount) {
-                                    has = true;
-                                    var tmpCountIndex = tmpRPos * AngleCount + tmpAnglePos;
+                                int tmpR = r + rDiff;
+                                if (tmpR < 0)
+                                    tmpR = -tmpR;
+                                int tmpAnglePos = angle + diff;
+                                while (tmpAnglePos >= AngleCount)
+                                    tmpAnglePos -= AngleCount;
+
+                                int tmpAngleNeg = angle - diff;
+                                while (tmpAngleNeg < 0) {
+                                    tmpAngleNeg += AngleCount;
+                                }
+
+                                if (tmpR < RCount && tmpAnglePos >= 0) {
+                                    var tmpCountIndex = tmpR * AngleCount + tmpAnglePos;
                                     if (TargetCellCounts[tmpCountIndex] > 0) {
                                         found = true;
                                         countIndex = tmpCountIndex;
@@ -160,29 +173,11 @@ namespace Systems {
                                     }
                                 }
 
-                                if (tmpRPos < RCount && tmpRPos >= 0 && tmpAngleNeg >= 0 && tmpAngleNeg < AngleCount) {
-                                    has = true;
-                                    var tmpCountIndex = tmpRPos * AngleCount + tmpAngleNeg;
+                                if (tmpR < RCount && tmpAngleNeg < AngleCount) {
+                                    var tmpCountIndex = tmpR * AngleCount + tmpAngleNeg;
                                     if (TargetCellCounts[tmpCountIndex] > 0) {
-                                        found = true;
-                                        countIndex = tmpCountIndex;
-                                        break;
-                                    }
-                                }
-                                if (tmpRNeg < RCount && tmpRNeg >= 0 && tmpAnglePos >= 0 && tmpAnglePos < AngleCount) {
-                                    has = true;
-                                    var tmpCountIndex = tmpRNeg * AngleCount + tmpAnglePos;
-                                    if (TargetCellCounts[tmpCountIndex] > 0) {
-                                        found = true;
-                                        countIndex = tmpCountIndex;
-                                        break;
-                                    }
-                                }
-
-                                if (tmpRNeg < RCount && tmpRNeg >= 0 && tmpAngleNeg >= 0 && tmpAngleNeg < AngleCount) {
-                                    has = true;
-                                    var tmpCountIndex = tmpRNeg * AngleCount + tmpAngleNeg;
-                                    if (TargetCellCounts[tmpCountIndex] > 0) {
+                                        Debug.Log(
+                                            $"FOUND: r: {tmpR}, angle: {tmpAnglePos}, countIndex: {tmpAngleNeg}");
                                         found = true;
                                         countIndex = tmpCountIndex;
                                         break;
@@ -197,7 +192,7 @@ namespace Systems {
                     var count = TargetCellCounts[countIndex];
                     if (count > 0) {
                         var firstIndex = countIndex * TargetCount;
-                        closestTarget = Grid[firstIndex + Random.NextInt(1, count)];
+                        closestTarget = Grid[firstIndex + Random.NextInt(0, count - 1)];
                     }
 
                     if (closestTarget != Entity.Null) {
@@ -222,18 +217,21 @@ namespace Systems {
 
             var targetEntityArray = _targetQuery.ToEntityArray(Allocator.TempJob);
             var targetTranslationArray = _targetQuery.ToComponentDataArray<Translation>(Allocator.TempJob);
+            
+            var soldierEntityArray = _targetQuery.ToEntityArray(Allocator.TempJob);
+            var soldierTranslationArray = _targetQuery.ToComponentDataArray<Translation>(Allocator.TempJob);
 
             float rStep = _gridSlice.rStep;
             float angleStep = _gridSlice.angleStep;
-            int rCount = (int) math.ceil(_gridSlice.mapSize / rStep) + 1;
-            int angleCount = (int) math.ceil(2 * math.PI / angleStep);
+            int rCount = (int) math.floor(_gridSlice.mapSize / rStep) + 1;
+            int angleCount = (int) math.floor(2 * math.PI / angleStep);
             float maxDist = _gridSlice.mapSize;
 
             int targetCount = targetEntityArray.Length;
             var rand = new Random((uint) Stopwatch.GetTimestamp());
 
-            if (_targetGrid.Length < (rCount + 1) * angleCount * targetEntityArray.Length) 
-                ReallocateGrid((rCount + 1) * angleCount * targetEntityArray.Length, ref _targetGrid);
+            if (_targetPolarGrid.Length < (rCount + 1) * angleCount * targetEntityArray.Length)
+                ReallocateGrid((rCount + 1) * angleCount * targetEntityArray.Length, ref _targetPolarGrid);
 
             var targetCellCounts = new NativeArray<int>(
                 (rCount + 1) * angleCount, Allocator.TempJob
@@ -251,7 +249,8 @@ namespace Systems {
                 targetCount, Allocator.TempJob
             );
 
-            var targetIndexBuilderJob = new IndexCalculateJob {
+
+            var targetIndexBuilderJob = new PolarIndexCalculateJob {
                 TargetTranslationArray = targetTranslationArray,
                 RCount = rCount,
                 RStep = rStep,
@@ -260,18 +259,18 @@ namespace Systems {
                 CountIndexArray = targetIndexArray
             };
 
-            var targetGridBuilderJob = new GridBuilderJob {
-                Grid = _targetGrid,
+            var targetGridBuilderJob = new PolarGridBuilderJob {
+                Grid = _targetPolarGrid,
                 CellCounts = targetCellCounts,
                 CountIndexArray = targetIndexArray,
                 TargetArray = targetEntityArray
             };
 
-            var findTargetJob = new FindTargetJob {
+            var findTargetJob = new SoldierFindTargetJob {
                 TranslationHandle = translationType,
                 TargetCompHandle = soldierShootingType,
                 TargetCellCounts = targetCellCounts,
-                Grid = _targetGrid,
+                Grid = _targetPolarGrid,
                 RStep = rStep,
                 AngleStep = angleStep,
                 AngleCount = angleCount,
@@ -282,15 +281,29 @@ namespace Systems {
                 SoldierCellCounts = soldierCellCounts
             };
             Dependency = targetIndexBuilderJob.Schedule(targetCount, 64, Dependency);
-            Dependency = targetGridBuilderJob.Schedule(Dependency);
-            Dependency = findTargetJob.ScheduleParallel(_soldierQuery, Dependency);
+            Dependency.Complete();
+            int countIndex = 0;
+            if (targetCount > 0) {
+                countIndex = targetIndexArray[targetCount - 1];
+                //Debug.Log($"Target CountIndex: {countIndex}");
+            }
 
+            Dependency = targetGridBuilderJob.Schedule(Dependency);
+            Dependency.Complete();
+            if (targetCount > 0) {
+                /*Debug.Log($"TargetCount In Cell {countIndex}: {targetCellCounts[countIndex]}");
+                Debug.Log($"Last Target In Cell {countIndex}: {_targetPolarGrid[countIndex]}");
+                Debug.Log($"targetCellCounts.Length: {targetCellCounts.Length}");*/
+            }
+
+            Dependency = findTargetJob.ScheduleParallel(_soldierQuery, Dependency);
             Dependency.Complete();
         }
 
         protected override void OnStopRunning() {
             base.OnStopRunning();
-            _targetGrid.Dispose();
+            _targetPolarGrid.Dispose();
+            _soldierPolarGrid.Dispose();
         }
     }
 }

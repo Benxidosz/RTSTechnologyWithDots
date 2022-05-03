@@ -10,7 +10,7 @@ using Unity.Physics.Systems;
 using Unity.Transforms;
 using UnityEngine;
 
-[UpdateAfter(typeof(FindTargetSystem))]
+[UpdateAfter(typeof(SoldierFindTargetSystem))]
 [UpdateAfter(typeof(BeginSimulationEntityCommandBufferSystem))]
 public partial class BulletSystem : SystemBase {
     private StepPhysicsWorld _stepPhysics;

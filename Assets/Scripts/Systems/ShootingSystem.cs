@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace Systems {
     [UpdateAfter(typeof(BulletSystem))]
-    [UpdateAfter(typeof(FindTargetSystem))]
+    [UpdateAfter(typeof(SoldierFindTargetSystem))]
     public partial class ShootingSystem : SystemBase {
         private EntityQuery _soldierQuery;
         private BeginSimulationEntityCommandBufferSystem _commandBufferSystem;
@@ -24,7 +24,7 @@ namespace Systems {
         }
 
         [BurstCompile]
-        private struct ShootJob : IJobEntityBatch {
+        private struct SoldierShootJob : IJobEntityBatch {
             public ComponentTypeHandle<SoldierShooting> SoldierShootingHandle;
             [ReadOnly] public ComponentTypeHandle<Translation> TranslationHandle;
             [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<float3> TargetPositionArray;
@@ -78,7 +78,7 @@ namespace Systems {
                     targetPositionArray[i] = _entityManager.GetComponentData<Translation>(target).Value;
             }
 
-            var job = new ShootJob {
+            var job = new SoldierShootJob {
                 SoldierShootingHandle = soldierShootingType,
                 TranslationHandle = translationType,
                 CommandBuffer = _commandBufferSystem.CreateCommandBuffer(),
