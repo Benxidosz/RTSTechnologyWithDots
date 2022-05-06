@@ -6,14 +6,14 @@ using Unity.Mathematics;
 using UnityEngine;
 
 [Serializable]
-public struct SoldierShooting : IComponentData {
+public struct Shooting : IComponentData {
     public float ShootingRange;
     public float ShootingSpeed;
     public float ShootingTimer;
     public Entity BulletPrefab;
 }
 
-public class SoldierShootingAuthoring : MonoBehaviour, IConvertGameObjectToEntity, IDeclareReferencedPrefabs {
+public class ShootingAuthoring : MonoBehaviour, IConvertGameObjectToEntity, IDeclareReferencedPrefabs {
     public float ShootingRange;
     public float ShootingSpeed;
     public GameObject BulletPrefab;
@@ -21,13 +21,13 @@ public class SoldierShootingAuthoring : MonoBehaviour, IConvertGameObjectToEntit
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
         var bullet = conversionSystem.GetPrimaryEntity(BulletPrefab);
 
-        var component = new SoldierShooting {
+        var component = new Shooting {
             ShootingRange = ShootingRange,
             ShootingSpeed = ShootingSpeed,
             BulletPrefab = bullet
         };
         
-        dstManager.AddComponent<SoldierShooting>(entity);
+        dstManager.AddComponent<Shooting>(entity);
         dstManager.SetComponentData(entity, component);
     }
 

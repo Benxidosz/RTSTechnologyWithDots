@@ -10,7 +10,7 @@ using Unity.Physics.Systems;
 using Unity.Transforms;
 using UnityEngine;
 
-[UpdateAfter(typeof(SoldierFindTargetSystem))]
+[UpdateAfter(typeof(FindTargetSystem))]
 [UpdateAfter(typeof(BeginSimulationEntityCommandBufferSystem))]
 public partial class BulletSystem : SystemBase {
     private StepPhysicsWorld _stepPhysics;
@@ -82,7 +82,7 @@ public partial class BulletSystem : SystemBase {
             var zombieComp = TravelGroup[zombieEntity];
 
             if (zombieComp.Soldier != Entity.Null) {
-                CommandBuffer.SetComponent(zombieComp.Soldier, new TargetComp {
+                CommandBuffer.SetComponent(zombieComp.Soldier, new TargetEntityComp {
                     Target = default
                 });
             }
