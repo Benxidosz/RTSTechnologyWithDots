@@ -25,7 +25,15 @@ namespace Systems {
         private NativeArray<Entity> _targetPolarGrid;
         private NativeArray<Entity> _soldierPolarGrid;
 
-        private float _tmpTime = 0f;
+        private NativeArray<int> _targetCellCounts;
+        private NativeArray<int> _soldierCellCounts;
+
+        private NativeArray<int> _targetIndexArray;
+        private NativeArray<int> _soldierIndexArray;
+
+        private NativeArray<int> _soldierGridTargetCountIndex;
+        
+        private int frame = 0;
 
 
         protected override void OnStartRunning() {
@@ -44,7 +52,7 @@ namespace Systems {
                     ComponentType.ReadOnly<Translation>()
                 }
             };
-            
+
             var towerDesc = new EntityQueryDesc {
                 All = new[] {
                     ComponentType.ReadOnly<Shooting>(),
@@ -63,6 +71,29 @@ namespace Systems {
             );
             _soldierPolarGrid = new NativeArray<Entity>(
                 0, Allocator.Persistent
+            );
+            
+            float rStep = _gridSlice.rStep;
+            float angleStep = _gridSlice.angleStep;
+            int rCount = (int) math.floor(_gridSlice.mapSize / rStep) + 1;
+            int angleCount = (int) math.floor(2 * math.PI / angleStep);
+            
+            _targetCellCounts = new NativeArray<int>(
+                (rCount + 1) * angleCount, Allocator.Persistent
+            );
+            _soldierCellCounts = new NativeArray<int>(
+                (rCount + 1) * angleCount, Allocator.Persistent
+            );
+            
+            _targetIndexArray = new NativeArray<int>(
+                0, Allocator.Persistent
+            );
+            _soldierIndexArray = new NativeArray<int>(
+                0, Allocator.Persistent
+            );
+            
+            _soldierGridTargetCountIndex = new NativeArray<int>(
+                (rCount + 1) * angleCount, Allocator.Persistent
             );
         }
 
@@ -105,11 +136,11 @@ namespace Systems {
             public NativeArray<Entity> Grid;
             public NativeArray<int> CellCounts;
 
-            [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<int> CountIndexArray;
+            [ReadOnly] public NativeArray<int> CountIndexArray;
             [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<Entity> EntityArray;
 
             public void Execute() {
-                for (int i = 0; i < CountIndexArray.Length; ++i) {
+                for (int i = 0; i < EntityArray.Length; ++i) {
                     int countIndex = CountIndexArray[i];
                     var entity = EntityArray[i];
                     int count = CellCounts[countIndex];
@@ -124,7 +155,7 @@ namespace Systems {
         [BurstCompile]
         private struct GridFindTargetJob : IJobParallelFor {
             [ReadOnly] public NativeArray<int> TargetCellCounts;
-            [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<int> SoldierCellCounts;
+            [ReadOnly] public NativeArray<int> SoldierCellCounts;
             public NativeArray<int> SoldierGridTargetCountIndex;
             public int AngleCount;
             public float MaxDist;
@@ -172,7 +203,7 @@ namespace Systems {
         [BurstCompile]
         private struct SoldierFindTargetJob : IJobEntityBatch {
             [ReadOnly] public NativeArray<Entity> Grid;
-            [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<int> SoldierGridTargetCountIndex;
+            [ReadOnly] public NativeArray<int> SoldierGridTargetCountIndex;
             [ReadOnly] public NativeArray<int> TargetCellCounts;
             public ComponentTypeHandle<TargetEntityComp> TargetCompHandle;
             [ReadOnly] public ComponentTypeHandle<Translation> TranslationHandle;
@@ -225,8 +256,7 @@ namespace Systems {
 
         [BurstCompile]
         public struct TowerFindTarget : IJobEntityBatch {
-            [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<int> TargetCellCounts;
-            [ReadOnly] public NativeArray<Entity> Grid;
+            [ReadOnly] public NativeArray<int> TargetCellCounts;
             
             public ComponentTypeHandle<TargetPosComp> TargetCompHandle;
             [ReadOnly] public ComponentTypeHandle<Translation> TranslationHandle;
@@ -314,9 +344,9 @@ namespace Systems {
             }
         }
 
-        private void ReallocateGrid(int length, ref NativeArray<Entity> grid) {
-            grid.Dispose();
-            grid = new NativeArray<Entity>(
+        private void ReallocateArray<T>(int length, ref NativeArray<T> array) where T : struct {
+            array.Dispose();
+            array = new NativeArray<T>(
                 length * 2, Allocator.Persistent
             );
         }
@@ -324,9 +354,6 @@ namespace Systems {
         protected override void OnUpdate() {
             //TODO: Limit the refresh time. All Array to global -> tasks in different time.
             Dependency.Complete();
-            var translationType = GetComponentTypeHandle<Translation>(true);
-            var soldierShootingType = GetComponentTypeHandle<TargetEntityComp>();
-            var towerShootingType = GetComponentTypeHandle<TargetPosComp>();
 
             var targetEntityArray = _targetQuery.ToEntityArray(Allocator.TempJob);
             var targetTranslationArray = _targetQuery.ToComponentDataArray<Translation>(Allocator.TempJob);
@@ -345,33 +372,19 @@ namespace Systems {
             var rand = new Random((uint) Stopwatch.GetTimestamp());
 
             if (_targetPolarGrid.Length < (rCount + 1) * angleCount * targetCount)
-                ReallocateGrid((rCount + 1) * angleCount * targetCount, ref _targetPolarGrid);
-            if(_soldierPolarGrid.Length < (rCount + 1) * angleCount * soldierCount)
-                ReallocateGrid((rCount + 1) * angleCount * soldierCount, ref _soldierPolarGrid);
-
-            var targetCellCounts = new NativeArray<int>(
-                (rCount + 1) * angleCount, Allocator.TempJob
-            );
-            var soldierCellCounts = new NativeArray<int>(
-                (rCount + 1) * angleCount, Allocator.TempJob
-            );
-            var soldierGridTargetCountIndex = new NativeArray<int>(
-                (rCount + 1) * angleCount, Allocator.TempJob
-            );
-
-            for (int i = 0; i < targetCellCounts.Length; ++i) {
-                targetCellCounts[i] = 0;
-                soldierCellCounts[i] = 0;
-                soldierGridTargetCountIndex[i] = -1;
+                ReallocateArray((rCount + 1) * angleCount * targetCount, ref _targetPolarGrid);
+            if (_soldierPolarGrid.Length < (rCount + 1) * angleCount * soldierCount)
+                ReallocateArray((rCount + 1) * angleCount * soldierCount, ref _soldierPolarGrid);
+            if (_targetIndexArray.Length < targetCount)
+                ReallocateArray(targetCount * 2, ref _targetIndexArray);
+            if (_soldierIndexArray.Length < soldierCount)
+                ReallocateArray(soldierCount * 2, ref _soldierIndexArray);
+            
+            for (int i = 0; i < _targetCellCounts.Length; ++i) {
+                _targetCellCounts[i] = 0;
+                _soldierCellCounts[i] = 0;
+                _soldierGridTargetCountIndex[i] = -1;
             }
-
-            var targetIndexArray = new NativeArray<int>(
-                targetCount, Allocator.TempJob
-            );
-            var soldierIndexArray = new NativeArray<int>(
-                soldierCount, Allocator.TempJob
-            );
-
 
             var targetIndexBuilderJob = new PolarIndexCalculateJob {
                 TranslationArray = targetTranslationArray,
@@ -379,7 +392,7 @@ namespace Systems {
                 RStep = rStep,
                 AngleCount = angleCount,
                 AngleStep = angleStep,
-                CountIndexArray = targetIndexArray
+                CountIndexArray = _targetIndexArray
             };
             
             var soldierIndexBuilderJob = new PolarIndexCalculateJob {
@@ -388,67 +401,71 @@ namespace Systems {
                 RStep = rStep,
                 AngleCount = angleCount,
                 AngleStep = angleStep,
-                CountIndexArray = soldierIndexArray
-            };
-
-            var targetGridBuilderJob = new PolarGridBuilderJob {
-                Grid = _targetPolarGrid,
-                CellCounts = targetCellCounts,
-                CountIndexArray = targetIndexArray,
-                EntityArray = targetEntityArray
-            };
-            
-            var soldierGridBuilderJob = new PolarGridBuilderJob {
-                Grid = _soldierPolarGrid,
-                CellCounts = soldierCellCounts,
-                CountIndexArray = soldierIndexArray,
-                EntityArray = soldierEntityArray
-            };
-
-            var gridFindTargetCountIndex = new GridFindTargetJob {
-                TargetCellCounts = targetCellCounts,
-                SoldierCellCounts = soldierCellCounts,
-                SoldierGridTargetCountIndex = soldierGridTargetCountIndex,
-                AngleCount = angleCount,
-                MaxDist = maxDist,
-            };
-
-            var findTargetJob = new SoldierFindTargetJob {
-                TranslationHandle = translationType,
-                TargetCompHandle = soldierShootingType,
-                TargetCellCounts = targetCellCounts,
-                Grid = _targetPolarGrid,
-                RStep = rStep,
-                AngleStep = angleStep,
-                AngleCount = angleCount,
-                TargetCount = targetCount,
-                Random = rand,
-                SoldierGridTargetCountIndex = soldierGridTargetCountIndex
-            };
-
-            var findTowerTargetJob = new TowerFindTarget {
-                TranslationHandle = translationType,
-                TargetCompHandle = towerShootingType,
-                Grid = _targetPolarGrid,
-                RStep = rStep,
-                AngleStep = angleStep,
-                AngleCount = angleCount,
-                Random = rand,
-                TargetCellCounts = targetCellCounts,
-                MaxDist = maxDist
+                CountIndexArray = _soldierIndexArray
             };
             
             Dependency = targetIndexBuilderJob.Schedule(targetCount, 64, Dependency);
             Dependency = soldierIndexBuilderJob.Schedule(soldierCount, 64, Dependency);
             Dependency.Complete();
 
+            var targetGridBuilderJob = new PolarGridBuilderJob {
+                Grid = _targetPolarGrid,
+                CellCounts = _targetCellCounts,
+                CountIndexArray = _targetIndexArray,
+                EntityArray = targetEntityArray
+            };
+            
+            var soldierGridBuilderJob = new PolarGridBuilderJob {
+                Grid = _soldierPolarGrid,
+                CellCounts = _soldierCellCounts,
+                CountIndexArray = _soldierIndexArray,
+                EntityArray = soldierEntityArray
+            };
+            
             Dependency = targetGridBuilderJob.Schedule(Dependency);
             Dependency = soldierGridBuilderJob.Schedule(Dependency);
             Dependency.Complete();
+
+            var gridFindTargetCountIndex = new GridFindTargetJob {
+                TargetCellCounts = _targetCellCounts,
+                SoldierCellCounts = _soldierCellCounts,
+                SoldierGridTargetCountIndex = _soldierGridTargetCountIndex,
+                AngleCount = angleCount,
+                MaxDist = maxDist,
+            };
             
-            Dependency = gridFindTargetCountIndex.Schedule(soldierCellCounts.Length, 64, Dependency);
+            Dependency = gridFindTargetCountIndex.Schedule(_soldierCellCounts.Length, 64, Dependency);
             Dependency.Complete();
             
+            var translationType = GetComponentTypeHandle<Translation>(true);
+            var soldierShootingType = GetComponentTypeHandle<TargetEntityComp>();
+            var towerShootingType = GetComponentTypeHandle<TargetPosComp>();
+
+
+            var findTargetJob = new SoldierFindTargetJob {
+                TranslationHandle = translationType,
+                TargetCompHandle = soldierShootingType,
+                TargetCellCounts = _targetCellCounts,
+                Grid = _targetPolarGrid,
+                RStep = rStep,
+                AngleStep = angleStep,
+                AngleCount = angleCount,
+                TargetCount = targetCount,
+                Random = rand,
+                SoldierGridTargetCountIndex = _soldierGridTargetCountIndex
+            };
+
+            var findTowerTargetJob = new TowerFindTarget {
+                TranslationHandle = translationType,
+                TargetCompHandle = towerShootingType,
+                RStep = rStep,
+                AngleStep = angleStep,
+                AngleCount = angleCount,
+                Random = rand,
+                TargetCellCounts = _targetCellCounts,
+                MaxDist = maxDist
+            };
+
             Dependency = findTargetJob.ScheduleParallel(_soldierQuery, Dependency);
             Dependency = findTowerTargetJob.ScheduleParallel(_towerQuery, Dependency);
             Dependency.Complete();
@@ -458,6 +475,14 @@ namespace Systems {
             base.OnStopRunning();
             _targetPolarGrid.Dispose();
             _soldierPolarGrid.Dispose();
+            
+            _targetCellCounts.Dispose();
+            _soldierCellCounts.Dispose();
+            
+            _soldierIndexArray.Dispose();
+            _targetIndexArray.Dispose();
+
+            _soldierGridTargetCountIndex.Dispose();
         }
     }
 }
