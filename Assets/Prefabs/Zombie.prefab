@@ -30,7 +30,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4209472723173427457}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -9.92}
+  m_LocalPosition: {x: 0, y: 1.5, z: -9.92}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -112,6 +112,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Damage: 1
   Speed: 4
+  Soldier: {fileID: 0}
 --- !u!114 &4209472723173427519
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -265,7 +266,7 @@ MonoBehaviour:
         Category01: 0
         Category02: 0
         Category03: 0
-        Category04: 0
+        Category04: 1
         Category05: 1
         Category06: 0
         Category07: 0
@@ -279,7 +280,7 @@ MonoBehaviour:
         Category15: 0
         Category16: 0
         Category17: 0
-        Category18: 1
+        Category18: 0
         Category19: 0
         Category20: 0
         Category21: 0

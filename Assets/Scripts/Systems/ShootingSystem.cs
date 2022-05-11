@@ -62,6 +62,7 @@ namespace Systems {
                             var bullet = CommandBuffer.Instantiate(soldierShooting.BulletPrefab);
                             CommandBuffer.SetComponent(bullet, velocityComponent);
                             CommandBuffer.SetComponent(bullet, translateComponent);
+                            CommandBuffer.AddComponent<SoldierBulletTag>(bullet);
                             CommandBuffer.AddComponent<BulletTag>(bullet);
                             soldierShooting.ShootingTimer = 0.0f;
                         }
@@ -94,7 +95,7 @@ namespace Systems {
                         if (!targetPosition.Equals(float3.zero)) {
                             var dir = math.normalize(targetPosition - towerTranslation.Value);
                             var velocityComponent = new PhysicsVelocity {
-                                Linear = dir * 10.0f
+                                Linear = dir * 30.0f
                             };
                             var translateComponent = new Translation {
                                 Value = towerTranslation.Value
@@ -102,6 +103,7 @@ namespace Systems {
                             var bullet = CommandBuffer.Instantiate(towerShooting.BulletPrefab);
                             CommandBuffer.SetComponent(bullet, velocityComponent);
                             CommandBuffer.SetComponent(bullet, translateComponent);
+                            CommandBuffer.AddComponent<BombTag>(bullet);
                             CommandBuffer.AddComponent<BulletTag>(bullet);
                             towerShooting.ShootingTimer = 0.0f;
                         }
@@ -150,6 +152,7 @@ namespace Systems {
         }
     }
 
-    public struct BulletTag : IComponentData {
-    }
+    public struct BulletTag : IComponentData { }
+    public struct SoldierBulletTag : IComponentData { }
+    public struct BombTag : IComponentData { }
 }

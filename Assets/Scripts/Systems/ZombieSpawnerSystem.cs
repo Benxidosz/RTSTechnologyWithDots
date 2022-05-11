@@ -25,8 +25,7 @@ namespace Systems {
             _zombieSpawnerTranslation = EntityManager.GetComponentData<Translation>(zombieSpawner);
             _zombieSpawnerComponent = EntityManager.GetComponentData<ZombieSpawnerComponent>(zombieSpawner);
 
-            _zombieGroup = GetEntityQuery(ComponentType.ReadOnly<TravelToCore>(),
-                ComponentType.ReadOnly<Translation>());
+            _zombieGroup = GetEntityQuery(ComponentType.ReadOnly<ZombieTag>());
 
             _deadZombie = GetEntityQuery(ComponentType.ReadOnly<DeadTag>(),
                 ComponentType.ReadOnly<TravelToCore>());
@@ -76,6 +75,7 @@ namespace Systems {
                     };
                     commandBuffer.SetComponent(entity, translation);
                     commandBuffer.SetComponent(entity, travelComp);
+                    commandBuffer.AddComponent<ZombieTag>(entity);
                 }
             }).Schedule();
             
@@ -83,4 +83,6 @@ namespace Systems {
             Dependency.Complete();
         }
     }
+    
+    public struct ZombieTag : IComponentData { }
 }

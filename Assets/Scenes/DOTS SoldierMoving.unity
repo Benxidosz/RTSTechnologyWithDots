@@ -544,7 +544,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224534, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: Count
-      value: 15000
+      value: 20000
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224534, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: Soldier
