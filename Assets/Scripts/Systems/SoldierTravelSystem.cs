@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Components;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -9,6 +11,9 @@ using Unity.Transforms;
 namespace Systems {
     public partial class SoldierTravelSystem : SystemBase {
         private EntityQuery _entityQuery;
+        
+        private Translation _coreTranslation;
+        private ZombieSpawnerComponent _coreSpawner;
 
         protected override void OnStartRunning() {
             base.OnStartRunning();
@@ -23,6 +28,12 @@ namespace Systems {
                     soldierMovement.destination = translation.Value;
                 })
                 .Schedule();
+            
+            var coreEntity = GetEntityQuery(typeof(CoreHealthComponent),
+                    typeof(Translation))
+                .GetSingletonEntity();
+            _coreTranslation = EntityManager.GetComponentData<Translation>(coreEntity);
+            _coreSpawner = EntityManager.GetComponentData<ZombieSpawnerComponent>(coreEntity);
         }
 
         [BurstCompile]
@@ -59,13 +70,12 @@ namespace Systems {
         protected override void OnUpdate() {
             var velocityType = GetComponentTypeHandle<PhysicsVelocity>();
             var translationType = GetComponentTypeHandle<Translation>();
-            var soldierMoveType = GetComponentTypeHandle<SoldierMovement>(true);
+            var soldierMoveType = GetComponentTypeHandle<SoldierMovement>();
             var job = new TravelJob {
                 TranslationHandle = translationType,
                 VelocityHandle = velocityType,
-                SoldierMovementHandle = soldierMoveType,
+                SoldierMovementHandle = soldierMoveType
             };
-
             Dependency = job.ScheduleParallel(_entityQuery, Dependency);
             Dependency.Complete();
         }

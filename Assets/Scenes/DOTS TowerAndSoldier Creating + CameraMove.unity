@@ -889,9 +889,17 @@ PrefabInstance:
       value: GameManager
       objectReference: {fileID: 0}
     - target: {fileID: 7593897996773480633, guid: 6a0c6079c95794242bc65f6b4bc4facd, type: 3}
+      propertyPath: point
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7593897996773480633, guid: 6a0c6079c95794242bc65f6b4bc4facd, type: 3}
       propertyPath: pointText
       value: 
       objectReference: {fileID: 292713136}
+    - target: {fileID: 7593897996773480633, guid: 6a0c6079c95794242bc65f6b4bc4facd, type: 3}
+      propertyPath: coreTransform
+      value: 
+      objectReference: {fileID: 1223226691}
     - target: {fileID: 7593897996773480633, guid: 6a0c6079c95794242bc65f6b4bc4facd, type: 3}
       propertyPath: towerCostText
       value: 
@@ -900,6 +908,14 @@ PrefabInstance:
       propertyPath: soldierCostText
       value: 
       objectReference: {fileID: 291511981}
+    - target: {fileID: 7593897996773480633, guid: 6a0c6079c95794242bc65f6b4bc4facd, type: 3}
+      propertyPath: maxSoldierRadius
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 7593897996773480633, guid: 6a0c6079c95794242bc65f6b4bc4facd, type: 3}
+      propertyPath: minSoldierRadius
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 7593897996773480634, guid: 6a0c6079c95794242bc65f6b4bc4facd, type: 3}
       propertyPath: m_RootOrder
       value: 6
@@ -1578,6 +1594,11 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1080784743}
   m_CullTransparentMesh: 1
+--- !u!4 &1223226691 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8753524229149224529, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
+  m_PrefabInstance: {fileID: 1616906620}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1350818947
 GameObject:
   m_ObjectHideFlags: 0
@@ -1708,7 +1729,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5276542875285722650, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: mapSize
-      value: 200
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 5276542875285722650, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: angleStepInDegree
@@ -1760,7 +1781,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224534, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: Count
-      value: 0
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224534, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: Soldier
@@ -1784,7 +1805,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224534, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: SoldierCount
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8753524229149224534, guid: 358209a4da606234ebed73e591aa3e34, type: 3}
       propertyPath: MaxSoldierRadius
@@ -2000,6 +2021,10 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 4558405881722769780, guid: 92275942bd6b4c04192e6be9f8e6846f, type: 3}
+      propertyPath: mapSize
+      value: 50
+      objectReference: {fileID: 0}
     - target: {fileID: 4558405881722769781, guid: 92275942bd6b4c04192e6be9f8e6846f, type: 3}
       propertyPath: m_RootOrder
       value: 5

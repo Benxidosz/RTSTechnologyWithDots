@@ -1,29 +1,31 @@
 using System.Diagnostics;
 using Components;
 using Unity.Entities;
+using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
-using Random = UnityEngine.Random;
+using Debug = UnityEngine.Debug;
 
 namespace Systems {
     [UpdateAfter(typeof(CoreTriggerEventSystem))]
     [UpdateAfter(typeof(BulletSystem))]
     public partial class ZombieSpawnerSystem : SystemBase {
         private Translation _zombieSpawnerTranslation;
-        private ZombieSpawnerComponent _zombieSpawnerComponent;
+        private Entity _zombieSpawner;
         private EntityQuery _zombieGroup;
         private EntityQuery _deadZombie;
         private Entity _prefab;
         private BeginSimulationEntityCommandBufferSystem _beginSimECB;
+        private int spawned = -5;
+        private int levelHardener = 10;
 
         protected override void OnStartRunning() {
             base.OnStartRunning();
-            var zombieSpawner = GetEntityQuery(typeof(CoreHealthComponent),
+            _zombieSpawner = GetEntityQuery(typeof(CoreHealthComponent),
                     typeof(Translation))
                 .GetSingletonEntity();
-            _zombieSpawnerTranslation = EntityManager.GetComponentData<Translation>(zombieSpawner);
-            _zombieSpawnerComponent = EntityManager.GetComponentData<ZombieSpawnerComponent>(zombieSpawner);
+            _zombieSpawnerTranslation = EntityManager.GetComponentData<Translation>(_zombieSpawner);
+            var _zombieSpawnerComponent = EntityManager.GetComponentData<ZombieSpawnerComponent>(_zombieSpawner);
 
             _zombieGroup = GetEntityQuery(ComponentType.ReadOnly<ZombieTag>());
 
@@ -39,6 +41,7 @@ namespace Systems {
             var spawnerTranslate = _zombieSpawnerTranslation;
             var rand = new Unity.Mathematics.Random((uint)Stopwatch.GetTimestamp());
             
+            
             for (int i = 0; i < count; i++) {
                 var entity = commandBuffer.Instantiate(soldierPrefab);
                 var alfa = rand.NextFloat(0.0f, 2 * math.PI);
@@ -47,9 +50,32 @@ namespace Systems {
                     Value = spawnerTranslate.Value + new float3(math.cos(alfa), 0.0f, math.sin(alfa)) * radius
                 };
                 commandBuffer.SetComponent(entity, translation);
+                commandBuffer.SetComponent(entity, new SoldierMovement {
+                    destination = translation.Value,
+                    speed = 5f
+                });
+            }
+        }
+
+        private struct ZombiSpawningJob : IJob {
+            public Entity ZombieSpawner;
+            public ZombieSpawnerComponent ZombieSpawnerComp;
+            public int increaseValue;
+            public EntityCommandBuffer CommandBuffer;
+            public void Execute() {
+                CommandBuffer.SetComponent(ZombieSpawner, new ZombieSpawnerComponent {
+                    Count = ZombieSpawnerComp.Count + increaseValue * 2,
+                    MaxRadius = ZombieSpawnerComp.MaxRadius,
+                    MaxSpeed = ZombieSpawnerComp.MaxSpeed,
+                    MaxSoldierRadius = ZombieSpawnerComp.MaxSoldierRadius,
+                    MinSoldierRadius = ZombieSpawnerComp.MinSoldierRadius,
+                    MinRadius = ZombieSpawnerComp.MinRadius,
+                    MinSpeed = ZombieSpawnerComp.MaxSpeed
+                });
             }
         }
         protected override void OnUpdate() {
+            var _zombieSpawnerComponent = EntityManager.GetComponentData<ZombieSpawnerComponent>(_zombieSpawner);
             var commandBuffer = _beginSimECB.CreateCommandBuffer();
             var count = _zombieSpawnerComponent.Count - _zombieGroup.CalculateEntityCount();
             var zombiePrefab = _prefab;
@@ -58,7 +84,6 @@ namespace Systems {
             var rand = new Unity.Mathematics.Random((uint)Stopwatch.GetTimestamp());
             
             commandBuffer.DestroyEntitiesForEntityQuery(_deadZombie);
-            
             Job.WithCode(() => {
                 for (int i = 0; i < count; i++) {
                     var entity = commandBuffer.Instantiate(zombiePrefab);
@@ -78,7 +103,21 @@ namespace Systems {
                     commandBuffer.AddComponent<ZombieTag>(entity);
                 }
             }).Schedule();
-            
+            Dependency.Complete();
+            this.spawned += count;
+            var increaseValue = 0;
+            Debug.Log(spawned);
+            if (spawned / levelHardener > 0 && spawned > 0) {
+                increaseValue = spawned / levelHardener;
+                spawned = spawned % levelHardener - (increaseValue * 2);
+                levelHardener += increaseValue * 5;
+            }
+            Dependency = new ZombiSpawningJob {
+                ZombieSpawner = _zombieSpawner,
+                ZombieSpawnerComp = _zombieSpawnerComponent,
+                increaseValue = increaseValue,
+                CommandBuffer = commandBuffer
+            }.Schedule();
             _beginSimECB.AddJobHandleForProducer(Dependency);
             Dependency.Complete();
         }

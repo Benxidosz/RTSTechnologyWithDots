@@ -14,10 +14,10 @@ GameObject:
   - component: {fileID: 5556018708607531899}
   - component: {fileID: 8391156316826188357}
   - component: {fileID: 2684139220972466073}
-  - component: {fileID: 1888685735910099407}
   - component: {fileID: 5169181002554606908}
   - component: {fileID: 5663155880469492943}
   - component: {fileID: 6299876772337767412}
+  - component: {fileID: 6755570560136086594}
   m_Layer: 0
   m_Name: Soldier
   m_TagString: Untagged
@@ -295,23 +295,6 @@ MonoBehaviour:
         Tag07: 0
     m_SerializedVersion: 1
   m_SerializedVersion: 1
---- !u!114 &1888685735910099407
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4227359389660604035}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e689e76b62b8c148873202c03c7e589, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  destination:
-    x: 0
-    y: 1
-    z: 0
-  speed: 5
 --- !u!114 &5169181002554606908
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -352,3 +335,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Target: {fileID: 0}
+--- !u!114 &6755570560136086594
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4227359389660604035}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e689e76b62b8c148873202c03c7e589, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  destination:
+    x: 0
+    y: 0
+    z: 0
+  speed: 5

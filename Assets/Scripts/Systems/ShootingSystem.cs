@@ -15,6 +15,7 @@ namespace Systems {
         private BeginSimulationEntityCommandBufferSystem _commandBufferSystem;
         private EntityManager _entityManager;
         private EntityQuery _towerQuery;
+        private Translation _coreTranslation;
 
         protected override void OnStartRunning() {
             base.OnStartRunning();
@@ -30,6 +31,11 @@ namespace Systems {
                 }
             };
             _towerQuery = GetEntityQuery(towerDesc);
+            
+            var coreEntity = GetEntityQuery(typeof(CoreHealthComponent),
+                    typeof(Translation))
+                .GetSingletonEntity();
+            _coreTranslation = EntityManager.GetComponentData<Translation>(coreEntity);
         }
 
         [BurstCompile]
@@ -38,6 +44,7 @@ namespace Systems {
             [ReadOnly] public ComponentTypeHandle<Translation> TranslationHandle;
             [DeallocateOnJobCompletion] [ReadOnly] public NativeArray<float3> TargetPositionArray;
             public EntityCommandBuffer CommandBuffer;
+            [ReadOnly] public Translation CoreTrans;
             [ReadOnly] public float dt;
 
             public void Execute(ArchetypeChunk batchInChunk, int batchIndex) {
@@ -51,6 +58,7 @@ namespace Systems {
                     soldierShooting.ShootingTimer += dt;
                     if (soldierShooting.ShootingTimer > soldierShooting.ShootingSpeed) {
                         var targetPosition = TargetPositionArray[i];
+                        targetPosition = targetPosition + math.normalize(CoreTrans.Value - targetPosition) * 2f;
                         if (!targetPosition.Equals(float3.zero)) {
                             var dir = math.normalize(targetPosition - soldierTranslation.Value);
                             var velocityComponent = new PhysicsVelocity {
@@ -135,6 +143,7 @@ namespace Systems {
                 TranslationHandle = translationType,
                 CommandBuffer = _commandBufferSystem.CreateCommandBuffer(),
                 TargetPositionArray = targetPositionArray,
+                CoreTrans = _coreTranslation,
                 dt = dt
             };
             var towerShootJob = new TowerShootJob {
