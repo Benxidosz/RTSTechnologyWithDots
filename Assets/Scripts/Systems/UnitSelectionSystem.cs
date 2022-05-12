@@ -37,9 +37,7 @@ namespace Systems {
             var ray = _mainCamera.ScreenPointToRay(Input.mousePosition);
             var rayStart = ray.origin;
             var rayEnd = ray.GetPoint(100.0f);
-            
-            Debug.Log("Katt");
-            
+
             if (Raycast(rayStart, rayEnd, new CollisionFilter {
                 BelongsTo = (uint) CollisionLayers.Selection,
                 CollidesWith = (uint) CollisionLayers.Ground
@@ -72,9 +70,7 @@ namespace Systems {
                 CollidesWith = (uint) (CollisionLayers.Ground | CollisionLayers.Soldier)
             }, out var raycastHit)) {
                 var hitEntity = _buildPhysicsWorld.PhysicsWorld.Bodies[raycastHit.RigidBodyIndex].Entity;
-                Debug.Log("Hit");
                 if (EntityManager.HasComponent<SelectableSoldierTag>(hitEntity)) {
-                    Debug.Log("Has");
                     EntityManager.AddComponent<SelectedEntityTag>(hitEntity);
                 }
             }
