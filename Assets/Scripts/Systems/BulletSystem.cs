@@ -15,7 +15,6 @@ using Debug = UnityEngine.Debug;
 using Random = Unity.Mathematics.Random;
 
 [UpdateAfter(typeof(FindTargetSystem))]
-[UpdateAfter(typeof(BeginSimulationEntityCommandBufferSystem))]
 public partial class BulletSystem : SystemBase {
     private StepPhysicsWorld _stepPhysics;
     private EntityQuery _bulletGroup;

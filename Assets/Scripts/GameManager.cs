@@ -42,6 +42,9 @@ public class GameManager : MonoBehaviour {
     private int towerCost = 100;
     [SerializeField] private GameObject towerPrefab;
     [SerializeField] private TextMeshProUGUI towerCostText;
+    [SerializeField] private GameObject towerIndicator;
+    private Transform _towerIndicatorTransform;
+    private Entity _towerEntity;
     
     private Camera _mainCamera;
     private float3 _corePos;
@@ -59,6 +62,7 @@ public class GameManager : MonoBehaviour {
         _blobAssetStore = new BlobAssetStore();
         var settings = GameObjectConversionSettings.FromWorld(World.DefaultGameObjectInjectionWorld, _blobAssetStore);
         _soldierEntity = GameObjectConversionUtility.ConvertGameObjectHierarchy(soldierPrefab, settings);
+        _towerEntity = GameObjectConversionUtility.ConvertGameObjectHierarchy(towerPrefab, settings);
         rand = new Unity.Mathematics.Random((uint)Stopwatch.GetTimestamp());
         var radius = rand.NextFloat(minSoldierRadius, maxSoldierRadius);
         var alfa = rand.NextFloat(0.0f, 2 * math.PI);
@@ -68,6 +72,9 @@ public class GameManager : MonoBehaviour {
             Value = new float3(0f, -5f, 0f)
         });
         _entityManager.RemoveComponent<Shooting>(entity);
+
+        _towerIndicatorTransform = towerIndicator.GetComponent<Transform>();
+        towerIndicator.SetActive(false);
     }
 
     void Start() {
@@ -90,6 +97,22 @@ public class GameManager : MonoBehaviour {
             var cameraPos = cameraTransform.position;
             cameraTransform.RotateAround(cameraPos, Vector3.up, 90);
             cameraTransform.position = new Vector3(cameraPos.z, cameraPos.y, -cameraPos.x);
+        }
+
+        if (towerIndicator.activeSelf) {
+            RaycastHit hit;
+            Ray ray = _mainCamera.ScreenPointToRay(Input.mousePosition);
+
+            if (Physics.Raycast(ray, out hit)) {
+                var hitPosition = hit.point;
+                _towerIndicatorTransform = towerIndicator.GetComponent<Transform>();
+                // Do something with the object that was hit by the raycast.
+                _towerIndicatorTransform.position = new Vector3(hitPosition.x, 7f, hitPosition.z);
+            }
+
+            if (Input.GetMouseButtonDown(0)) {
+                BuildTower();
+            }
         }
     }
 
@@ -115,7 +138,11 @@ public class GameManager : MonoBehaviour {
     }
 
     private void BuildTower() {
-        
+        var entity = _entityManager.Instantiate(_towerEntity);
+        _entityManager.SetComponentData(entity, new Translation {
+            Value = _towerIndicatorTransform.position
+        });
+        towerIndicator.SetActive(false);
     }
     
     public void BuySoldier() {
@@ -138,7 +165,7 @@ public class GameManager : MonoBehaviour {
             return;
 
         point -= towerCost;
-        BuildTower();
+        towerIndicator.SetActive(true);
 
         towerCost += 100;
         towerCostText.text = $"{towerCost} $";

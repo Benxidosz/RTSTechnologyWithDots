@@ -15,6 +15,7 @@ using Random = Unity.Mathematics.Random;
 
 namespace Systems {
     [UpdateAfter(typeof(StepPhysicsWorld))]
+    [UpdateAfter(typeof(TravelToCoreSystem))]
     [UpdateAfter(typeof(BeginSimulationEntityCommandBufferSystem))]
     public partial class FindTargetSystem : SystemBase {
         private EntityQuery _soldierQuery;
@@ -175,7 +176,7 @@ namespace Systems {
                 int targetCountIndex = countIndex;
                 if (TargetCellCounts[targetCountIndex] == 0) {
                     bool found = false;
-                    int dist = 1;
+                    int dist = 0;
                     while (!found && dist < MaxDist) {
                         for (int diff = 0; diff <= dist; ++diff) {
                             int rDiff = dist - diff;

@@ -106,7 +106,6 @@ namespace Systems {
             Dependency.Complete();
             this.spawned += count;
             var increaseValue = 0;
-            Debug.Log(spawned);
             if (spawned / levelHardener > 0 && spawned > 0) {
                 increaseValue = spawned / levelHardener;
                 spawned = spawned % levelHardener - (increaseValue * 2);
